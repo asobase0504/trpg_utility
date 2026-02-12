@@ -109,7 +109,7 @@
                     <span>▼</span>
                 </div>
                 <div class="ans-content" id="ans-${i}">
-                    ${questions.map((q, j) => `<p><strong>Q${j+1}. ${q}</strong><br>${ans['質問'+(j+1)] || '未回答'}</p>').join('')}
+                    ${questions.map((q, j) => `<p><strong>Q${j+1}. ${q}</strong><br>${ans['質問'+(j+1)] || '未回答'}</p>`).join('')}
                 </div>
             `;
             container.appendChild(card);
