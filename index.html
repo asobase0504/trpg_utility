@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>12人の200問回答プロジェクト</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; }
+        body { font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #0f172a; }
+
+        /* 入力フォームのスタイル */
+        .form-section { background: white; padding: 30px; border-radius: 12px; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 40px; }
+        .q-item { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e2e8f0; }
+        .q-item label { display: block; font-weight: bold; margin-bottom: 8px; color: #334155; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; resize: vertical; box-sizing: border-box; }
+        
+        /* ボタンと進捗 */
+        .sticky-footer { position: sticky; bottom: 20px; background: white; padding: 15px; border-radius: 50px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        button:disabled { background: #94a3b8; }
+
+        /* 回答表示（アコーディオン形式） */
+        .ans-card { background: #fff; margin-bottom: 10px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .ans-header { padding: 15px; background: #f1f5f9; cursor: pointer; font-weight: bold; display: flex; justify-content: space-between; }
+        .ans-content { padding: 15px; display: none; background: white; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 200問インタビュー</h1>
+
+    <div class="form-section">
+        <h2>回答を入力する</h2>
+        <form id="mainForm">
+            <div style="margin-bottom: 30px;">
+                <label><strong>● あなたのお名前</strong></label>
+                <input type="text" name="名前" id="userName" required style="width:100%; padding:10px; margin-top:5px;">
+            </div>
+            
+            <div id="questionsContainer">
+                <p>質問を読み込み中...</p>
+            </div>
+
+            <div class="sticky-footer">
+                <span id="progressText">0 / 200 完了</span>
+                <button type="submit" id="submitBtn">スプレッドシートへ送信</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="display-section">
+        <h2>みんなの回答を見る</h2>
+        <div id="answersContainer">
+            <p>回答データを読み込み中...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const GAS_URL = "https://docs.google.com/spreadsheets/d/114dEzuB7Q5a0QtVzz9LtHayHimC_DaR1ODhqDdb86rA/edit?gid=0#gid=0"; 
+
+    // 1. データ取得（質問と回答）
+    async function init() {
+        try {
+            const res = await fetch(GAS_URL);
+            const data = await res.json();
+            
+            // 質問の生成
+            renderQuestions(data.questions);
+            // 回答の生成
+            renderAnswers(data.answers, data.questions);
+        } catch (e) {
+            console.error(e);
+            document.getElementById('questionsContainer').innerHTML = "データの読み込みに失敗しました。";
+        }
+    }
+
+    // 質問リストを画面に作る
+    function renderQuestions(questions) {
+        const container = document.getElementById('questionsContainer');
+        container.innerHTML = "";
+        
+        questions.forEach((q, i) => {
+            const div = document.createElement('div');
+            div.className = "q-item";
+            div.innerHTML = `
+                <label>${i + 1}. ${q}</label>
+                <textarea name="質問${i+1}" placeholder="回答を入力してください" oninput="updateProgress()"></textarea>
+            `;
+            container.appendChild(div);
+        });
+        document.getElementById('progressText').innerText = `0 / ${questions.length} 完了`;
+    }
+
+    // 回答リストを表示する
+    function renderAnswers(answers, questions) {
+        const container = document.getElementById('answersContainer');
+        container.innerHTML = answers.length ? "" : "まだ回答はありません。";
+
+        answers.forEach((ans, i) => {
+            const card = document.createElement('div');
+            card.className = "ans-card";
+            card.innerHTML = `
+                <div class="ans-header" onclick="toggleAns(${i})">
+                    <span>👤 ${ans.名前} さんの回答</span>
+                    <span>▼</span>
+                </div>
+                <div class="ans-content" id="ans-${i}">
+                    ${questions.map((q, j) => `<p><strong>Q${j+1}. ${q}</strong><br>${ans['質問'+(j+1)] || '未回答'}</p>').join('')}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // アコーディオンの開閉
+    function toggleAns(id) {
+        const content = document.getElementById(`ans-${id}`);
+        content.style.display = content.style.display === "block" ? "none" : "block";
+    }
+
+    // 進捗表示
+    function updateProgress() {
+        const textareas = document.querySelectorAll('#mainForm textarea');
+        const filled = Array.from(textareas).filter(t => t.value.trim() !== "").length;
+        document.getElementById('progressText').innerText = `${filled} / ${textareas.length} 完了`;
+    }
+
+    // 送信処理
+    document.getElementById('mainForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = "送信中...";
+
+        const formData = new FormData(e.target);
+        const payload = Object.fromEntries(formData.entries());
+
+        try {
+            await fetch(GAS_URL, {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+            alert("送信しました！");
+            location.reload();
+        } catch (e) {
+            alert("エラーが発生しました");
+            btn.disabled = false;
+        }
+    };
+
+    init();
+</script>
+</body>
+</html>
